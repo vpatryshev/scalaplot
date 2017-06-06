@@ -1,5 +1,8 @@
 package org.sameersingh.scalaplot
 
+import java.io.File
+
+import language.postfixOps
 import gnuplot.GnuplotPlotter
 import jfreegraph.JFGraphPlotter
 import org.junit._
@@ -151,6 +154,8 @@ class ExampleXYTest {
     import org.sameersingh.scalaplot.Implicits._
     val x = 0.0 until 10.0 by 0.01
     val rnd = new scala.util.Random(0)
-    println(output(PNG("docs/img/", "scatter"), xyChart(x -> Seq(Y(x, style = XYPlotStyle.Lines), Y(x.map(_ + rnd.nextDouble - 0.5), style = XYPlotStyle.Dots)))))
+    val folder = new File("doc/img/")
+    folder.mkdirs()
+    println(output(PNG(folder.getPath, "scatter"), xyChart(x -> Seq(Y(x, style = XYPlotStyle.Lines), Y(x.map(_ + rnd.nextDouble - 0.5), style = XYPlotStyle.Dots)))))
   }
 }

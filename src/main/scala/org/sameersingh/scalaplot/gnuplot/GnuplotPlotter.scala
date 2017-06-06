@@ -273,13 +273,29 @@ class GnuplotPlotter(chart: Chart) extends Plotter(chart) {
 
   def postPlotFileXYSeries(series: FileXYSeries) {}
 
+  def plotLabelChart(chart: LabelChart) = {
+    lines +=
+      """# LabelChart settings
+        |set termoption enhanced
+        |set encoding utf8
+        |unset xtics
+        |unset ytics
+        |unset key
+        |set border 0
+        |set size square
+        |set datafile separator ","
+        |plot '-' using 2:3:1 with labels
+      """.stripMargin
+
+    for (label <- chart.data) lines += label.gpl
+  }
+
   def writeScriptFile(directory: String, filenamePrefix: String, terminal: String,
                       filenameSuffix: String, stdout: Boolean = false, defaultTerminal: String = "dumb") {
     // write the description
-    assert(new File(directory).isDirectory, directory + " should be a directory")
-    assert(directory.endsWith("/"), directory + " should end with a /")
+    assert(new File(directory).isDirectory, s"$directory should be a directory - current is ${new File(".").getCanonicalPath}")
     reset
-    this.directory = directory
+    this.directory = if (directory.endsWith("/")) directory else (directory+"/")
     filename = filenamePrefix
     plotChart(chart, terminal)
     lines += "set terminal %s" format (terminal)
@@ -288,13 +304,14 @@ class GnuplotPlotter(chart: Chart) extends Plotter(chart) {
     chart match {
       case xyc: XYChart => plotXYChart(xyc)
       case bc: BarChart => plotBarChart(bc)
+      case lc: LabelChart => plotLabelChart(lc)
     }
     lines += "unset output"
     lines += "# Wrapup"
     lines += "set terminal %s" format (defaultTerminal)
     lines += "refresh"
 
-    val scriptFile = directory + filenamePrefix + ".gpl"
+    val scriptFile = this.directory + filenamePrefix + ".gpl"
     val writer = new PrintWriter(scriptFile)
     for (line <- lines) {
       writer.println(line)
@@ -321,7 +338,7 @@ class GnuplotPlotter(chart: Chart) extends Plotter(chart) {
   override def svg(directory: String, filenamePrefix: String): String = {
     if (chart.monochrome) println("Warning: Monochrome ignored.")
     val sizeString = if (chart.size.isDefined) "size %f,%f" format(chart.size.get._1, chart.size.get._2) else ""
-    val terminal = "svg enhanced linewidth 3.0 %s" format (sizeString)
+    val terminal = "svg enhanced linewidth 3.0 %s" format sizeString
     writeScriptFile(directory, filenamePrefix, terminal, "svg", true, "unknown")
     runGnuplot(directory, filenamePrefix)
   }
@@ -346,7 +363,7 @@ class GnuplotPlotter(chart: Chart) extends Plotter(chart) {
     val terminal = "canvas enhanced name\"%s\"" format (filenamePrefix)
     writeScriptFile(directory, filenamePrefix, terminal, "js")
     runGnuplot(directory, filenamePrefix)
-    htmlWrap(directory, filenamePrefix)
+    htmlWrap(filenamePrefix)
   }
 
   def js2(directory: String, filenamePrefix: String): String = {
@@ -372,10 +389,10 @@ class GnuplotPlotter(chart: Chart) extends Plotter(chart) {
     }
     writer.close()
     val str = runGnuplot(directory, filenamePrefix)
-    htmlWrap(directory, filenamePrefix)
+    htmlWrap(filenamePrefix)
   }
 
-  private def htmlWrap(directory: String, filenamePrefix: String, jsDir: String = "/usr/local/Cellar/gnuplot/4.6.5/share/gnuplot/4.6/js") = {
+  private def htmlWrap(filenamePrefix: String, jsDir: String = "/usr/local/Cellar/gnuplot/4.6.5/share/gnuplot/4.6/js") = {
     """
       |   <html>
       |       <head>
@@ -399,12 +416,10 @@ class GnuplotPlotter(chart: Chart) extends Plotter(chart) {
     val cmdLine = "gnuplot " + filenamePrefix + ".gpl"
 
     try {
-      val p = Runtime.getRuntime().exec(cmdLine, Array.empty[String], new File(directory))
-      val input = new BufferedReader(new InputStreamReader(p.getInputStream()))
-      while (({
-        line = input.readLine();
-        line
-      }) != null) {
+      println(s"${new File(directory).getCanonicalPath}> $cmdLine")
+      val p = Runtime.getRuntime.exec(cmdLine, Array.empty[String], new File(directory))
+      val input = new BufferedReader(new InputStreamReader(p.getInputStream))
+      while (input.readLine() != null) {
         output += (line + '\n')
       }
       input.close()
